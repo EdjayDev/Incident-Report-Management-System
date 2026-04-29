@@ -18,46 +18,55 @@ public partial class frmLogin : Form
     private void btnlogin_Click(object sender, EventArgs e)
     {
         errorProvider1.Clear();
-
+    
+        bool hasError = false;
+    
         if (string.IsNullOrWhiteSpace(txtusername.Text))
+        {
             errorProvider1.SetError(txtusername, "Input is empty");
-
-        if (string.IsNullOrWhiteSpace(txtpassword.Text))
-            errorProvider1.SetError(txtpassword, "Input is empty");
-
-        int errorCount = 0;
-        foreach (Control control in errorProvider1.ContainerControl.Controls)
-        {
-            if (!string.IsNullOrEmpty(errorProvider1.GetError(control)))
-                errorCount++;
+            hasError = true;
         }
-
-        if (errorCount == 0)
+    
+        if (string.IsNullOrWhiteSpace(txtpassword.Text))
         {
-            try
+            errorProvider1.SetError(txtpassword, "Input is empty");
+            hasError = true;
+        }
+    
+        if (hasError) return;
+    
+        try
+        {
+            //Parameterized query
+            string query = "SELECT * FROM tblaccounts WHERE username = @username AND password = @password AND status = 'ACTIVE'";
+    
+            var parameters = new Dictionary<string, object>
             {
-                // ❗ Replace this with parameterized query and password hashing
-                string query = $"SELECT * FROM tblaccounts WHERE username = '{txtusername.Text}' AND password = '{txtpassword.Text}' AND status = 'ACTIVE'";
-                DataTable dt = login.GetData(query);
-
-                if (dt.Rows.Count > 0)
-                {
-                    string username = dt.Rows[0].Field<string>("username");
-                    string usertype = dt.Rows[0].Field<string>("usertype");
-
-                    var mainForm = new frmMain(username, usertype);
-                    mainForm.Show();
-                    this.Hide();
-                }
-                else
-                {
-                    MessageBox.Show("Incorrect account information or account is inactive", "Message", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
-                }
-            }
-            catch (Exception ex)
+                { "@username", txtusername.Text },
+                { "@password", txtpassword.Text }
+            };
+    
+            DataTable dt = login.GetData(query, parameters); // assumes overload
+    
+            if (dt.Rows.Count > 0)
             {
-                MessageBox.Show(ex.Message, "Error on login", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                string username = dt.Rows[0]["username"].ToString();
+                string usertype = dt.Rows[0]["usertype"].ToString();
+    
+                var mainForm = new frmMain(username, usertype);
+                mainForm.Show();
+                this.Hide();
             }
+            else
+            {
+                MessageBox.Show("Incorrect account information or account is inactive",
+                    "Message", MessageBoxButtons.OK, MessageBoxIcon.Exclamation);
+            }
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.Message, "Error on login",
+                MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 
