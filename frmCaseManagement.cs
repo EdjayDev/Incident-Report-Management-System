@@ -10,7 +10,7 @@ public partial class frmCaseManagement : Form
     private string username;
     private string studentnumber, lastname, firstname, middlename, yearlevel, course;
     private string violationcode, violationdescription, status, caseid, resolution, schoolyear, concernlevel, recommendation;
-    private int row;
+    private int row = -1;
 
     public frmCaseManagement(string username)
     {
@@ -34,14 +34,15 @@ public partial class frmCaseManagement : Form
     {
         try
         {
-            DataTable dt = db.GetData(
+            string query =
                 "SELECT c.caseID, c.violationID, c.violationCount, v.description, " +
                 "c.status, c.resolution, c.schoolyear, c.concernlevel, c.recommendation, c.createdBy, c.dateCreated " +
                 "FROM tblcases c " +
                 "INNER JOIN tblviolations v ON c.violationID = v.violationcode " +
                 "WHERE c.studentID = '" + txtstudentid.Text + "' " +
-                "ORDER BY c.caseID DESC"
-            );
+                "ORDER BY c.caseID DESC";
+
+            DataTable dt = db.GetData(query);
             dataGridView1.DataSource = dt;
         }
         catch (Exception ex)
@@ -54,7 +55,10 @@ public partial class frmCaseManagement : Form
     {
         try
         {
+            if (e.RowIndex < 0) return;
+
             row = e.RowIndex;
+
             dataGridView1.Rows[e.RowIndex].DefaultCellStyle.WrapMode = DataGridViewTriState.True;
             dataGridView1.AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.AllCells;
         }
@@ -66,38 +70,26 @@ public partial class frmCaseManagement : Form
 
     private void dataGridView1_CellLeave(object sender, DataGridViewCellEventArgs e)
     {
+        if (e.RowIndex < 0) return;
+
         dataGridView1.Rows[e.RowIndex].DefaultCellStyle.WrapMode = DataGridViewTriState.False;
         dataGridView1.AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.AllCells;
     }
 
     private void txtstudentid_TextChanged(object sender, EventArgs e)
     {
-        txtlastname.Clear();
-        txtfirstname.Clear();
-        txtmiddlename.Clear();
-        txtyearlevel.Clear();
-        txtcourse.Clear();
+        ClearStudentFields();
 
-        string caseQuery = 
-            "SELECT c.caseID, c.violationID, c.violationCount, v.description, " +
-            "c.status, c.resolution, c.schoolyear, c.concernlevel, c.recommendation, c.createdBy, c.dateCreated " +
-            "FROM tblcases c " +
-            "INNER JOIN tblviolations v ON c.violationID = v.violationcode " +
-            "WHERE c.studentID = '" + txtstudentid.Text + "' " +
-            "ORDER BY c.caseID DESC";
-
-        DataTable caseDetails = db.GetData(caseQuery);
-
-        dataGridView1.DataSource = null;
-        dataGridView1.Rows.Clear();
-        dataGridView1.Columns.Clear();
-
-        if (caseDetails.Rows.Count > 0)
+        if (string.IsNullOrWhiteSpace(txtstudentid.Text))
         {
-            dataGridView1.DataSource = caseDetails;
+            DisableControls();
+            dataGridView1.DataSource = null;
+            return;
         }
 
-        string studentQuery = 
+        LoadCases();
+
+        string studentQuery =
             "SELECT studentLN, studentFN, studentMN, yearLevel, studentCourse " +
             "FROM tblstudents " +
             "WHERE studentID = '" + txtstudentid.Text + "'";
@@ -106,17 +98,7 @@ public partial class frmCaseManagement : Form
 
         if (studentInfo.Rows.Count > 0)
         {
-            labelguide.Visible = false;
-            btn_refresh.Visible = true;
-            btn_refresh.Enabled = true;
-            btn_refresh.BackColor = Color.FromArgb(150, 0, 52, 112);
-            btnAdd.Visible = true;
-            btnupdate.Visible = true;
-            paneloptionlist.BackColor = SystemColors.Highlight;
-            paneladdcase.Enabled = true;
-            panelupdatecase.Enabled = true;
-            paneladdcase.BackColor = Color.LimeGreen;
-            panelupdatecase.BackColor = Color.FromArgb(89, 133, 225);
+            EnableControls();
 
             txtlastname.Text = studentInfo.Rows[0]["studentLN"].ToString();
             txtfirstname.Text = studentInfo.Rows[0]["studentFN"].ToString();
@@ -126,18 +108,57 @@ public partial class frmCaseManagement : Form
         }
         else
         {
-            labelguide.Visible = true;
-            btn_refresh.Visible = false;
-            btn_refresh.Enabled = false;
-            btn_refresh.BackColor = Color.Transparent;
-            btnAdd.Visible = false;
-            btnupdate.Visible = false;
-            paneloptionlist.BackColor = SystemColors.ButtonShadow;
-            paneladdcase.Enabled = false;
-            panelupdatecase.Enabled = false;
-            paneladdcase.BackColor = SystemColors.ButtonShadow;
-            panelupdatecase.BackColor = SystemColors.ButtonShadow;
+            DisableControls();
         }
+    }
+
+    private void ClearStudentFields()
+    {
+        txtlastname.Clear();
+        txtfirstname.Clear();
+        txtmiddlename.Clear();
+        txtyearlevel.Clear();
+        txtcourse.Clear();
+    }
+
+    private void EnableControls()
+    {
+        labelguide.Visible = false;
+
+        btn_refresh.Visible = true;
+        btn_refresh.Enabled = true;
+        btn_refresh.BackColor = Color.FromArgb(150, 0, 52, 112);
+
+        btnAdd.Visible = true;
+        btnupdate.Visible = true;
+
+        paneloptionlist.BackColor = SystemColors.Highlight;
+
+        paneladdcase.Enabled = true;
+        panelupdatecase.Enabled = true;
+
+        paneladdcase.BackColor = Color.LimeGreen;
+        panelupdatecase.BackColor = Color.FromArgb(89, 133, 225);
+    }
+
+    private void DisableControls()
+    {
+        labelguide.Visible = true;
+
+        btn_refresh.Visible = false;
+        btn_refresh.Enabled = false;
+        btn_refresh.BackColor = Color.Transparent;
+
+        btnAdd.Visible = false;
+        btnupdate.Visible = false;
+
+        paneloptionlist.BackColor = SystemColors.ButtonShadow;
+
+        paneladdcase.Enabled = false;
+        panelupdatecase.Enabled = false;
+
+        paneladdcase.BackColor = SystemColors.ButtonShadow;
+        panelupdatecase.BackColor = SystemColors.ButtonShadow;
     }
 
     private void btnclear_Click(object sender, EventArgs e)
@@ -155,12 +176,29 @@ public partial class frmCaseManagement : Form
         yearlevel = txtyearlevel.Text;
         course = txtcourse.Text;
 
-        frmAddCase addCaseForm = new frmAddCase(this, studentnumber, lastname, firstname, middlename, yearlevel, course, username);
+        frmAddCase addCaseForm = new frmAddCase(
+            this,
+            studentnumber,
+            lastname,
+            firstname,
+            middlename,
+            yearlevel,
+            course,
+            username
+        );
+
         addCaseForm.Show();
     }
 
     private void btnupdate_Click(object sender, EventArgs e)
     {
+        if (row < 0 || dataGridView1.Rows.Count == 0)
+        {
+            MessageBox.Show("Please select a case first.", "No Selected Case",
+                MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
         studentnumber = txtstudentid.Text;
         lastname = txtlastname.Text;
         firstname = txtfirstname.Text;
@@ -177,7 +215,25 @@ public partial class frmCaseManagement : Form
         concernlevel = dataGridView1.Rows[row].Cells[7].Value.ToString();
         recommendation = dataGridView1.Rows[row].Cells[8].Value.ToString();
 
-        frmUpdateCase updateCaseForm = new frmUpdateCase(this, studentnumber, lastname, firstname, middlename, yearlevel, course, username, violationcode, violationdescription, status, caseid, resolution, schoolyear, concernlevel, recommendation);
+        frmUpdateCase updateCaseForm = new frmUpdateCase(
+            this,
+            studentnumber,
+            lastname,
+            firstname,
+            middlename,
+            yearlevel,
+            course,
+            username,
+            violationcode,
+            violationdescription,
+            status,
+            caseid,
+            resolution,
+            schoolyear,
+            concernlevel,
+            recommendation
+        );
+
         updateCaseForm.Show();
     }
 
