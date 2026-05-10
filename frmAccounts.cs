@@ -6,19 +6,20 @@ using System.Windows.Forms;
 public partial class frmAccounts : Form
 {
     private string username;
+    private int row = -1;
+
+    // Replace with actual SQL Server credentials
+    SQLHelperClass sqlHelper = new SQLHelperClass("YOUR_SERVER_NAME", "YOUR_DATABASE_NAME", "YOUR_USERNAME", "YOUR_PASSWORD");
 
     public frmAccounts(string username)
     {
         InitializeComponent();
         this.username = username;
+
         this.Draggable(true);
         this.Text = " ";
         this.FormBorderStyle = FormBorderStyle.Sizable;
     }
-
-    // Replace the values with your actual SQL Server info
-    // Format: new SQLHelperClass("SERVER_NAME", "DATABASE_NAME", "USERNAME", "PASSWORD");
-    SQLHelperClass sqlHelper = new SQLHelperClass("YOUR_SERVER_NAME", "YOUR_DATABASE_NAME", "YOUR_USERNAME", "YOUR_PASSWORD");
 
     private void frmAccounts_Load(object sender, EventArgs e)
     {
@@ -29,9 +30,12 @@ public partial class frmAccounts : Form
     {
         try
         {
-            DataTable dt = sqlHelper.GetData("SELECT username, password, usertype, status, createdby, datecreated FROM tblaccounts WHERE username <> '" +
-                username + "' ORDER BY username");
-            dataGridView1.DataSource = dt;
+            string query = "SELECT username, password, usertype, status, createdby, datecreated " +
+                           "FROM tblaccounts " +
+                           "WHERE username <> '" + username + "' " +
+                           "ORDER BY username";
+
+            dataGridView1.DataSource = sqlHelper.GetData(query);
         }
         catch (Exception ex)
         {
@@ -43,9 +47,14 @@ public partial class frmAccounts : Form
     {
         try
         {
-            DataTable dt = sqlHelper.GetData("SELECT username, password, usertype, status, createdby, datecreated FROM tblaccounts WHERE username <> '" +
-                username + "' AND (username LIKE '%" + txtsearch.Text + "%' OR usertype LIKE '%" + txtsearch.Text + "%') ORDER BY username");
-            dataGridView1.DataSource = dt;
+            string query = "SELECT username, password, usertype, status, createdby, datecreated " +
+                           "FROM tblaccounts " +
+                           "WHERE username <> '" + username + "' " +
+                           "AND (username LIKE '%" + txtsearch.Text + "%' " +
+                           "OR usertype LIKE '%" + txtsearch.Text + "%') " +
+                           "ORDER BY username";
+
+            dataGridView1.DataSource = sqlHelper.GetData(query);
         }
         catch (Exception ex)
         {
@@ -66,29 +75,57 @@ public partial class frmAccounts : Form
 
     private void btnupdate_Click(object sender, EventArgs e)
     {
+        if (row < 0)
+        {
+            MessageBox.Show("Please select an account first.", "Message", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
         string editusername = dataGridView1.Rows[row].Cells[0].Value.ToString();
         string editpassword = dataGridView1.Rows[row].Cells[1].Value.ToString();
         string editype = dataGridView1.Rows[row].Cells[2].Value.ToString();
         string editstatus = dataGridView1.Rows[row].Cells[3].Value.ToString();
-        frmUpdateAccount updateaccountfrm = new frmUpdateAccount(this, editusername, editpassword, editype, editstatus, username);
+
+        frmUpdateAccount updateaccountfrm =
+            new frmUpdateAccount(this, editusername, editpassword, editype, editstatus, username);
+
         updateaccountfrm.Show();
     }
 
     private void btndelete_Click(object sender, EventArgs e)
     {
-        DialogResult dr = MessageBox.Show("Are you sure you want to delete this account?", "Confirmation", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+        if (row < 0)
+        {
+            MessageBox.Show("Please select an account first.", "Message", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return;
+        }
+
+        DialogResult dr = MessageBox.Show(
+            "Are you sure you want to delete this account?",
+            "Confirmation",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Question);
+
         if (dr == DialogResult.Yes)
         {
             string selecteduser = dataGridView1.Rows[row].Cells[0].Value.ToString();
+
             try
             {
                 sqlHelper.executeSQL("DELETE FROM tblaccounts WHERE username = '" + selecteduser + "'");
+
                 if (sqlHelper.rowAffected > 0)
                 {
-                    sqlHelper.executeSQL("INSERT INTO tbllogs (datelog, timelog, action, module, ID, performedby) VALUES ('" + DateTime.Now.ToShortDateString() + "', '" + DateTime.Now.ToShortTimeString() +
-                                "', 'Delete', 'Accounts Management', '" + selecteduser + "', '" + username + "')");
+                    sqlHelper.executeSQL(
+                        "INSERT INTO tbllogs (datelog, timelog, action, module, ID, performedby) VALUES ('" +
+                        DateTime.Now.ToShortDateString() + "', '" +
+                        DateTime.Now.ToShortTimeString() + "', 'Delete', 'Accounts Management', '" +
+                        selecteduser + "', '" + username + "')");
+
                     MessageBox.Show("Account Deleted", "Message", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
                     LoadAccounts();
+                    row = -1;
                 }
             }
             catch (Exception ex)
@@ -98,15 +135,17 @@ public partial class frmAccounts : Form
         }
     }
 
-    private int row;
-
     private void dataGridView1_CellClick(object sender, DataGridViewCellEventArgs e)
     {
         try
         {
-            row = e.RowIndex;
-            dataGridView1.Rows[e.RowIndex].DefaultCellStyle.WrapMode = DataGridViewTriState.True;
-            dataGridView1.AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.AllCells;
+            if (e.RowIndex >= 0)
+            {
+                row = e.RowIndex;
+
+                dataGridView1.Rows[e.RowIndex].DefaultCellStyle.WrapMode = DataGridViewTriState.True;
+                dataGridView1.AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.AllCells;
+            }
         }
         catch (Exception ex)
         {
@@ -114,10 +153,20 @@ public partial class frmAccounts : Form
         }
     }
 
+    private void dataGridView1_CellLeave(object sender, DataGridViewCellEventArgs e)
+    {
+        if (e.RowIndex >= 0)
+        {
+            dataGridView1.Rows[e.RowIndex].DefaultCellStyle.WrapMode = DataGridViewTriState.False;
+            dataGridView1.AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.AllCells;
+        }
+    }
+
     // DESIGN UI EVENTS
+
     private void btnrefresh_Click(object sender, EventArgs e)
     {
-        frmAccounts_Load(sender, e);
+        LoadAccounts();
     }
 
     private void btn_close_Click(object sender, EventArgs e)
@@ -192,11 +241,5 @@ public partial class frmAccounts : Form
     private void btndelete_MouseLeave(object sender, EventArgs e)
     {
         btndelete.BackColor = Color.Azure;
-    }
-
-    private void dataGridView1_CellLeave(object sender, DataGridViewCellEventArgs e)
-    {
-        dataGridView1.Rows[e.RowIndex].DefaultCellStyle.WrapMode = DataGridViewTriState.False;
-        dataGridView1.AutoSizeRowsMode = DataGridViewAutoSizeRowsMode.AllCells;
     }
 }
